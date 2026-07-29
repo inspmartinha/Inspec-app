@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Relatórios de Inspeção</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1C2530">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Inspeções">
+
+<style>
+  :root{
+    --navy:#1C2530; --navy-2:#26313F; --steel:#4A5A68;
+    --paper:#F6F4EF; --paper-2:#EDEAE1;
+    --amber:#E8A33D; --amber-dark:#C6821F;
+    --green:#4C7A5D; --red:#B8483C; --border:#D8D3C7;
+    --ink:#20262B; --muted:#6B7580;
+    --i-interna:#4C7A5D; --i-externa:#C6821F; --i-tubulacao:#3E6E8E;
+    --f-display: Georgia, 'Segoe UI', Arial, sans-serif;
+    --f-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    --f-mono: Consolas, 'SFMono-Regular', Menlo, 'Liberation Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:var(--f-sans); background:var(--paper); color:var(--ink); }
+  .app{ display:flex; min-height:100vh; }
+
+  .sidebar{
+    width:260px; flex-shrink:0; background:var(--navy); color:#DCE2E7;
+    padding:22px 0 90px; position:sticky; top:0; height:100vh; overflow-y:auto;
+  }
+  .brand{ padding:0 20px 18px; border-bottom:1px solid rgba(255,255,255,.1); margin-bottom:10px; }
+  .brand .code{ font-family:var(--f-mono); font-size:11px; letter-spacing:.06em; color:var(--amber); }
+  .brand h1{ font-family:var(--f-display); font-weight:600; font-size:17px; letter-spacing:.02em; margin:4px 0 0; line-height:1.25; }
+
+  .mode-switch{ display:flex; flex-direction:column; gap:2px; padding:0 12px 14px; margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,.1); }
+  .mode-btn{ all:unset; cursor:pointer; display:flex; align-items:center; gap:9px; padding:10px 10px; border-radius:6px; font-size:13px; color:#B8C2CB; }
+  .mode-btn:hover{ background:rgba(255,255,255,.05); color:#fff; }
+  .mode-btn.active{ background:rgba(232,163,61,.14); color:#fff; font-weight:600; }
+  .mode-btn .ic{ font-size:15px; }
+
+  .navlist{ list-style:none; margin:0; padding:0; }
+  .navlist button{
+    all:unset; cursor:pointer; display:flex; align-items:center; gap:10px;
+    width:100%; padding:10px 20px; font-size:13px; color:#B8C2CB; border-left:3px solid transparent;
+  }
+  .navlist button:hover{ background:rgba(255,255,255,.04); color:#fff; }
+  .navlist button.active{ background:rgba(232,163,61,.1); border-left-color:var(--amber); color:#fff; font-weight:500; }
+  .navlist .dot{ width:7px; height:7px; border-radius:50%; background:#3B4753; flex-shrink:0; }
+  .navlist .dot.done{ background:var(--green); }
+  .sidebar-foot{ position:fixed; bottom:0; left:0; width:260px; padding:14px 20px; background:var(--navy); border-top:1px solid rgba(255,255,255,.1); font-family:var(--f-mono); font-size:11px; color:#8894A0; }
+
+  .main{ flex:1; min-width:0; padding:34px 40px 120px; }
+  .hidden{ display:none !important; }
+
+  /* type switcher */
+  .type-switch{ display:flex; gap:10px; margin-bottom:22px; }
+  .type-btn{
+    all:unset; cursor:pointer; flex:1; padding:14px 16px; border-radius:8px;
+    border:1.5px solid var(--border); background:#fff; text-align:left;
+    display:flex; flex-direction:column; gap:3px;
+  }
+  .type-btn .tt{ font-family:var(--f-display); font-size:14px; font-weight:600; color:var(--navy); letter-spacing:.02em; }
+  .type-btn .ts{ font-size:11px; color:var(--muted); }
+  .type-btn[data-active="true"]{ border-color:var(--current-color, var(--amber-dark)); background:var(--current-tint,#FBF0DC); }
+  .type-btn[data-active="true"] .tt{ color:var(--current-color, var(--amber-dark)); }
+
+  .plate{
+    background:linear-gradient(155deg,#3A4753,#232D38); border-radius:6px; padding:22px 26px;
+    color:#EDEFF1; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), 0 6px 18px rgba(0,0,0,.15);
+    position:relative; overflow:hidden;
+  }
+  .plate::before, .plate::after{ content:""; position:absolute; width:9px; height:9px; border-radius:50%; background:radial-gradient(circle at 35% 35%, #cfd6db, #6b7580); top:10px; }
+  .plate::before{ left:10px; } .plate::after{ right:10px; }
+  .plate .p-left .p-label{ font-family:var(--f-mono); font-size:10px; letter-spacing:.12em; color:var(--amber); }
+  .plate .p-left .p-tag{ font-family:var(--f-display); font-size:28px; font-weight:600; letter-spacing:.03em; margin-top:2px;}
+  .plate .p-right{ text-align:right; font-family:var(--f-mono); font-size:12px; color:#B8C2CB; line-height:1.6; }
+  .plate .p-right b{ color:#fff; font-weight:500; }
+  .plate .p-right .badge{ display:inline-block; padding:1px 8px; border-radius:3px; font-size:10px; margin-left:6px; color:#1a1a1a; }
+
+  section.card{ background:#fff; border:1px solid var(--border); border-radius:8px; margin-bottom:18px; scroll-margin-top:20px; }
+  section.card > .card-head{ padding:16px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  section.card > .card-head h2{ font-family:var(--f-display); font-size:16px; font-weight:600; letter-spacing:.02em; margin:0; color:var(--navy); display:flex; align-items:center; gap:9px; }
+  section.card > .card-head h2 .n{ font-family:var(--f-mono); font-size:11px; color:var(--amber-dark); background:#FBF0DC; padding:2px 7px; border-radius:4px; }
+  .card-body{ padding:20px 22px; }
+  .card-body.pad-0{ padding:0; }
+
+  .grid{ display:grid; gap:14px; }
+  .g2{ grid-template-columns:1fr 1fr; } .g3{ grid-template-columns:1fr 1fr 1fr; }
+  @media (max-width:760px){ .g2,.g3{ grid-template-columns:1fr; } }
+
+  label{ display:block; font-size:11.5px; font-weight:600; color:var(--steel); letter-spacing:.03em; text-transform:uppercase; margin-bottom:5px; }
+  input[type=text], input[type=date], input[type=number], select, textarea{
+    width:100%; padding:9px 11px; border:1px solid var(--border); border-radius:5px;
+    font-family:var(--f-sans); font-size:13.5px; color:var(--ink); background:#FCFBF8;
+  }
+  input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--amber-dark); background:#fff; box-shadow:0 0 0 3px rgba(232,163,61,.15); }
+  textarea{ resize:vertical; min-height:70px; line-height:1.5; }
+  .field{ margin-bottom:0; }
+  .subhead{ font-family:var(--f-display); font-size:13px; font-weight:600; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:0 0 10px; padding-top:14px; border-top:1px solid var(--paper-2); }
+  .subhead:first-child{ padding-top:0; border-top:none; }
+  .yn{ display:flex; gap:16px; align-items:center; margin-bottom:10px; }
+  .yn label{ text-transform:none; font-size:13px; font-weight:500; color:var(--ink); display:flex; align-items:center; gap:6px; margin:0; }
+  .yn input[type=radio]{ width:15px; height:15px; accent-color:var(--amber-dark); }
+
+  .pressure-row{ display:grid; grid-template-columns:1fr 90px 90px; gap:8px; align-items:end; }
+  .unit-tag{ font-family:var(--f-mono); font-size:11px; color:var(--muted); text-align:center; padding-bottom:9px;}
+
+  table.ref{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  table.ref th{ text-align:left; background:var(--paper-2); padding:8px 12px; font-family:var(--f-mono); font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--steel);}
+  table.ref td{ padding:8px 12px; border-top:1px solid var(--border); }
+  table.ref tr td:first-child{ font-family:var(--f-mono); white-space:nowrap; }
+
+  .photo-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
+  .photo-card{ border:1px solid var(--border); border-radius:7px; overflow:hidden; background:#FCFBF8; }
+  .photo-card .thumb{ aspect-ratio:4/3; background:#E9E5DA center/cover no-repeat; }
+  .photo-card .thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .photo-card .cap{ padding:10px; }
+  .photo-card input{ font-size:12.5px; padding:7px 9px; }
+  .photo-card .rm{ all:unset; cursor:pointer; font-size:11px; color:var(--red); padding:0 10px 10px; display:block; }
+  .add-photo{ border:1.5px dashed var(--border); border-radius:7px; min-height:170px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--muted); cursor:pointer; background:#FCFBF8; font-size:12.5px; text-align:center; padding:14px; }
+  .add-photo:hover{ border-color:var(--amber-dark); color:var(--amber-dark); }
+  .add-photo .ic{ font-size:22px; }
+  input[type=file]{ display:none; }
+
+  .sig-grid{ display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+  .sig-box{ border:1px solid var(--border); border-radius:7px; padding:16px; }
+  .sig-box h3{ font-family:var(--f-display); font-size:13px; margin:0 0 12px; color:var(--navy); text-transform:uppercase; letter-spacing:.04em;}
+
+  .bar{ position:fixed; left:260px; right:0; bottom:0; background:#fff; border-top:1px solid var(--border); padding:14px 40px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 -6px 18px rgba(0,0,0,.05); flex-wrap:wrap; gap:10px; }
+  .bar .status{ font-size:12px; color:var(--muted); font-family:var(--f-mono); }
+  .actions{ display:flex; gap:10px; flex-wrap:wrap; }
+  .btn{ all:unset; cursor:pointer; font-family:var(--f-sans); font-size:13px; font-weight:600; padding:10px 18px; border-radius:6px; letter-spacing:.01em; }
+  .btn.ghost{ border:1px solid var(--border); color:var(--steel); }
+  .btn.ghost:hover{ background:var(--paper-2); }
+  .btn.amber{ background:var(--amber); color:#2b1c04; }
+  .btn.amber:hover{ background:var(--amber-dark); color:#fff; }
+  .btn.primary{ background:var(--navy); color:#fff; }
+  .btn.primary:hover{ background:#111820; }
+  .btn.green{ background:var(--green); color:#fff; }
+  .btn.green:hover{ background:#3d6449; }
+  .btn:disabled{ opacity:.5; pointer-events:none; }
+
+  .note{ background:#FBF0DC; border:1px solid #EAD3A0; color:#6B4B10; font-size:12px; padding:10px 14px; border-radius:6px; margin-bottom:20px; line-height:1.5; }
+
+  [data-types]{ }
+  .hidden-type{ display:none !important; }
+
+  .item-photos{ margin-top:8px; }
+  .item-photo-btn{
+    all:unset; cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+    font-size:11.5px; font-weight:600; color:var(--steel);
+    border:1px dashed var(--border); border-radius:5px; padding:5px 10px;
+  }
+  .item-photo-btn:hover{ border-color:var(--amber-dark); color:var(--amber-dark); }
+  .item-photo-btn .cnt{
+    background:var(--amber); color:#2b1c04; border-radius:9px; font-size:10px;
+    padding:0 6px; font-family:var(--f-mono); display:none;
+  }
+  .item-photo-btn .cnt.show{ display:inline-block; }
+  .item-thumbs{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .item-thumb{ position:relative; width:64px; height:64px; border-radius:5px; overflow:hidden; border:1px solid var(--border); }
+  .item-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .item-thumb button{
+    all:unset; cursor:pointer; position:absolute; top:2px; right:2px;
+    width:16px; height:16px; border-radius:50%; background:rgba(20,20,20,.7); color:#fff;
+    font-size:10px; line-height:16px; text-align:center;
+  }
+  .item-photo-input{ display:none; }
+
+  .linked-gallery{ display:flex; flex-direction:column; gap:14px; margin-bottom:20px; }
+  .linked-group{ border:1px solid var(--border); border-radius:7px; padding:12px 14px; }
+  .linked-group .lg-title{ font-family:var(--f-mono); font-size:11px; letter-spacing:.04em; color:var(--steel); text-transform:uppercase; margin-bottom:8px; }
+  .linked-group .item-thumbs{ margin-top:0; }
+  .gallery-divider{ font-family:var(--f-display); font-size:12.5px; font-weight:600; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:4px 0 12px; padding-top:14px; border-top:1px solid var(--paper-2); }
+  .gallery-divider:first-child{ border-top:none; padding-top:0; }
+
+  .iso-card{ border:1.5px solid var(--border); border-radius:8px; padding:16px; background:#FCFBF8; }
+  .iso-head{ display:flex; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+  .iso-num-badge{ font-family:var(--f-display); font-weight:600; font-size:13px; color:#fff; background:var(--i-tubulacao); padding:5px 11px; border-radius:5px; flex-shrink:0; }
+  .iso-head input[type=text]{ flex:1; min-width:180px; }
+  .iso-remove{ all:unset; cursor:pointer; font-size:11.5px; color:var(--red); font-weight:600; padding:7px 11px; border:1px solid var(--border); border-radius:5px; flex-shrink:0; }
+  .iso-remove:hover{ background:#FBEAE8; border-color:var(--red); }
+  .iso-body{ display:flex; flex-direction:column; gap:14px; }
+
+  /* Histórico */
+  .history-toolbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; gap:10px; flex-wrap:wrap; }
+  .history-toolbar h2{ font-family:var(--f-display); font-size:20px; color:var(--navy); margin:0; }
+  .history-empty{ color:var(--muted); font-size:13px; background:#fff; border:1px dashed var(--border); border-radius:8px; padding:30px; text-align:center; }
+  .history-row{ background:#fff; border:1px solid var(--border); border-radius:8px; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:10px; flex-wrap:wrap; }
+  .history-row .hr-info{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .history-row .hr-tag{ font-family:var(--f-display); font-size:16px; font-weight:600; color:var(--navy); min-width:110px; }
+  .history-row .hr-badge{ font-family:var(--f-mono); font-size:10px; letter-spacing:.06em; color:#fff; padding:3px 8px; border-radius:4px; }
+  .history-row .hr-meta{ font-size:12px; color:var(--muted); }
+  .history-row .hr-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .history-row .btn{ padding:7px 12px; font-size:12px; }
+
+  @media(max-width:900px){ .sidebar{ display:none; } .bar{ left:0; } .main{ padding:20px 18px 120px; } .type-switch{ flex-direction:column; } }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <nav class="sidebar">
+    <div class="brand">
+      <h1>Relatório de<br>Inspeção</h1>
+    </div>
+
+    <div class="mode-switch">
+      <button class="mode-btn active" id="navFormBtn" type="button"><span class="ic">📝</span>Formulário</button>
+      <button class="mode-btn" id="navHistoryBtn" type="button"><span class="ic">🕘</span>Histórico de Inspeções</button>
+    </div>
+
+    <ul class="navlist" id="navlist"></ul>
+    <div class="sidebar-foot" id="footStatus">v1.0 · offline</div>
+  </nav>
+
+  <main class="main">
+
+    <!-- ===================== VISTA: FORMULÁRIO ===================== -->
+    <div id="formView">
+
+      <div class="type-switch" id="typeSwitch">
+        <button class="type-btn" data-type="interna">
+          <span class="tt">Inspeção Interna</span>
+          <span class="ts">Calotas, costado, boca de visita, acessórios internos</span>
+        </button>
+        <button class="type-btn" data-type="externa">
+          <span class="tt">Inspeção Externa</span>
+          <span class="ts">Estrutura, suportes, flanges, instrumentos</span>
+        </button>
+        <button class="type-btn" data-type="tubulacao">
+          <span class="tt">Inspeção de Tubulação</span>
+          <span class="ts">Linhas, isolamento, ligações, suportes, passarelas</span>
+        </button>
+      </div>
+
+      <div class="plate">
+        <div class="p-left">
+          <div class="p-label">TAG DO EQUIPAMENTO</div>
+          <div class="p-tag" id="plateTag">— — —</div>
+        </div>
+        <div class="p-right">
+          UNIDADE: <b id="plateUnidade">—</b><br>
+          LOCAL: <b id="plateLocal">—</b> <span class="badge" id="plateBadge">—</span>
+        </div>
+      </div>
+
+      <!-- 1 Identificação -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Identificação do Equipamento</h2></div>
+        <div class="card-body grid g2">
+          <div class="field"><label>Unidade</label><input type="text" data-field="unidade" oninput="syncPlate()"></div>
+          <div class="field"><label>Local</label><input type="text" data-field="local" oninput="syncPlate()"></div>
+          <div class="field"><label>TAG</label><input type="text" data-field="tag" oninput="syncPlate()" placeholder="ex.: V-1042"></div>
+          <div class="field"><label>Descrição</label><input type="text" data-field="descricao"></div>
+          <div class="field"><label>Tipo de equipamento</label><input type="text" data-field="tipoEquip"></div>
+          <div class="field"><label>Área</label><input type="text" data-field="area"></div>
+          <div class="field"><label>Classe de fluido</label><input type="text" data-field="classeFluido"></div>
+          <div class="field"><label>Grupo potencial de risco</label><input type="text" data-field="grupoRisco"></div>
+          <div class="field"><label>Categoria</label><input type="text" data-field="categoria"></div>
+        </div>
+      </section>
+
+      <!-- 2 Dados da inspeção -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Dados da Inspeção</h2></div>
+        <div class="card-body grid g2">
+          <div class="field"><label>Nº do Relatório de Inspeção</label><input type="text" data-field="numRI"></div>
+          <div class="field"><label>Nº da Ordem de Manutenção</label><input type="text" data-field="numOM"></div>
+          <div class="field"><label>Tipo de Inspeção</label><input type="text" data-field="tipoInspecaoTxt" readonly></div>
+          <div></div>
+          <div class="field"><label>Data de início da inspeção</label><input type="date" data-field="dataInicio"></div>
+          <div class="field"><label>Data de término da inspeção</label><input type="date" data-field="dataFim"></div>
+        </div>
+      </section>
+
+      <!-- 3 Objetivo -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Objetivo</h2></div>
+        <div class="card-body"><textarea data-field="objetivo" placeholder="Descreva o objetivo da inspeção…"></textarea></div>
+      </section>
+
+      <!-- 4 Histórico -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Histórico de Inspeções Anteriores</h2></div>
+        <div class="card-body grid g2">
+          <div class="field"><label id="lblUltima">Última inspeção</label><input type="date" data-field="ultimaInspecao"></div>
+          <div class="field"><label>Número do relatório (RI)</label><input type="text" data-field="numRIAnterior"></div>
+        </div>
+      </section>
+
+      <!-- 5 Próximas inspeções -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Próximas Inspeções</h2></div>
+        <div class="card-body grid g2">
+          <div class="field"><label id="lblProxima">Próxima inspeção</label><input type="date" data-field="proximaInspecao"></div>
+        </div>
+      </section>
+
+      <!-- 6 Dados técnicos -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Dados Técnicos</h2></div>
+        <div class="card-body">
+          <div class="grid g3">
+            <div class="field"><label>TAG</label><input type="text" data-field="dtTag"></div>
+            <div class="field" data-types-only="interna,externa"><label>Código de Equipamento (CE)</label><input type="text" data-field="dtCE"></div>
+            <div class="field" data-types-only="interna,externa"><label>Tipo de equipamento</label><input type="text" data-field="dtTipo"></div>
+            <div class="field" style="grid-column:span 3"><label>Descrição ou função</label><input type="text" data-field="dtDescricao"></div>
+            <div class="field"><label>Norma de projeto</label><input type="text" data-field="dtNorma"></div>
+            <div class="field"><label>Ano de fabricação</label><input type="number" data-field="dtAno"></div>
+            <div class="field" data-types-only="interna,externa"><label>Fabricante</label><input type="text" data-field="dtFabricante"></div>
+            <div class="field"><label>Material</label><input type="text" data-field="dtMaterial"></div>
+            <div class="field"><label>Fluido</label><input type="text" data-field="dtFluido"></div>
+            <div class="field" data-types-only="interna,externa"><label>Volume [m³]</label><input type="text" data-field="dtVolume"></div>
+          </div>
+          <div class="subhead" style="margin-top:14px;">Pressões</div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div class="pressure-row">
+              <div class="field"><label>Pressão Máx. de Trabalho Admissível (PMTA)</label><input type="text" data-field="pmtaKpa" placeholder="kPa"></div>
+              <div class="field"><label>kgf/cm²</label><input type="text" data-field="pmtaKgf"></div>
+              <div class="unit-tag">PMTA</div>
+            </div>
+            <div class="pressure-row">
+              <div class="field"><label>Pressão de Operação</label><input type="text" data-field="popKpa" placeholder="kPa"></div>
+              <div class="field"><label>kgf/cm²</label><input type="text" data-field="popKgf"></div>
+              <div class="unit-tag">OPER.</div>
+            </div>
+            <div class="pressure-row">
+              <div class="field"><label>Pressão de Teste Hidrostático</label><input type="text" data-field="phKpa" placeholder="kPa"></div>
+              <div class="field"><label>kgf/cm²</label><input type="text" data-field="phKgf"></div>
+              <div class="unit-tag">TESTE</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6b Linhas inspecionadas (só tubulação) -->
+      <section class="card" data-section data-types="tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Linhas Inspecionadas</h2></div>
+        <div class="card-body"><textarea data-field="linhasInspecionadas" placeholder="Liste as linhas inspecionadas, numeradas sequencialmente…"></textarea></div>
+      </section>
+
+      <!-- 7 Info complementares -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Informações Complementares</h2></div>
+        <div class="card-body"><textarea data-field="infoComplementar"></textarea></div>
+      </section>
+
+      <!-- 8 Serviços realizados -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Serviços Realizados</h2></div>
+        <div class="card-body"><textarea data-field="servicosRealizados"></textarea></div>
+      </section>
+
+      <!-- 9 INSPEÇÃO ESPECÍFICA -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span><span id="secEspecificaTitle">Inspeção</span></h2></div>
+        <div class="card-body">
+
+          <!-- INTERNA -->
+          <div data-types-only="interna" style="display:flex; flex-direction:column; gap:16px;">
+            <div class="field" data-photo-key="iCalotas" data-photo-label="Calotas"><label>Calotas</label><textarea data-field="iCalotas"></textarea></div>
+            <div class="field" data-photo-key="iCostado" data-photo-label="Costado"><label>Costado</label><textarea data-field="iCostado"></textarea></div>
+            <div class="field" data-photo-key="iConexoes" data-photo-label="Conexões"><label>Conexões</label><textarea data-field="iConexoes"></textarea></div>
+            <div class="field" data-photo-key="iBocaVisita" data-photo-label="Boca de visita"><label>Boca de visita</label><textarea data-field="iBocaVisita"></textarea></div>
+            <div class="field" data-photo-key="iAcessorios" data-photo-label="Acessórios internos"><label>Acessórios internos</label><textarea data-field="iAcessorios"></textarea></div>
+            <div class="subhead">Válvula de Segurança</div>
+            <div class="grid g3">
+              <div class="field"><label>TAG</label><input type="text" data-field="vsTag"></div>
+              <div class="field"><label>Certificado</label><input type="text" data-field="vsCertificado"></div>
+              <div class="field"><label>Condição em campo</label><input type="text" data-field="vsCondicao"></div>
+            </div>
+            <div data-photo-key="iValvula" data-photo-label="Válvula de Segurança"></div>
+          </div>
+
+          <!-- EXTERNA -->
+          <div data-types-only="externa" style="display:flex; flex-direction:column; gap:16px;">
+            <div class="field" data-photo-key="eEscadas" data-photo-label="Escadas e plataformas"><label>Escadas e plataformas</label><textarea data-field="eEscadas"></textarea></div>
+            <div class="field" data-photo-key="eSuportes" data-photo-label="Suportes"><label>Suportes</label><textarea data-field="eSuportes"></textarea></div>
+            <div class="field" data-photo-key="eBase" data-photo-label="Base de sustentação"><label>Base de sustentação</label><textarea data-field="eBase"></textarea></div>
+            <div class="field" data-photo-key="eSaia" data-photo-label="Saia"><label>Saia</label><textarea data-field="eSaia"></textarea></div>
+            <div class="field" data-photo-key="eDrenos" data-photo-label="Drenos e vents"><label>Drenos e vents</label><textarea data-field="eDrenos"></textarea></div>
+            <div class="field" data-photo-key="eTomadas" data-photo-label="Tomadas de instrumentos"><label>Tomadas de instrumentos</label><textarea data-field="eTomadas"></textarea></div>
+            <div class="field" data-photo-key="eCostado" data-photo-label="Costado"><label>Costado</label><textarea data-field="eCostado"></textarea></div>
+            <div class="field" data-photo-key="eCalotas" data-photo-label="Calotas"><label>Calotas</label><textarea data-field="eCalotas"></textarea></div>
+            <div class="field" data-photo-key="eConexoes" data-photo-label="Conexões"><label>Conexões</label><textarea data-field="eConexoes"></textarea></div>
+            <div class="subhead">Válvula de Segurança</div>
+            <div class="grid g3">
+              <div class="field"><label>TAG</label><input type="text" data-field="eVsTag"></div>
+              <div class="field"><label>Certificado</label><input type="text" data-field="eVsCertificado"></div>
+              <div class="field"><label>Condição em campo</label><input type="text" data-field="eVsCondicao"></div>
+            </div>
+            <div data-photo-key="eValvula" data-photo-label="Válvula de Segurança"></div>
+            <div class="field" data-photo-key="eFlanges" data-photo-label="Flanges e válvulas"><label>Flanges e válvulas</label><textarea data-field="eFlanges"></textarea></div>
+            <div class="field" data-photo-key="eSteamTracing" data-photo-label="Steam tracing"><label>Steam tracing</label><textarea data-field="eSteamTracing"></textarea></div>
+            <div class="field" data-photo-key="eAterramento" data-photo-label="Aterramento"><label>Aterramento</label><textarea data-field="eAterramento"></textarea></div>
+            <div class="field" data-photo-key="eInstrumentos" data-photo-label="Instrumentos"><label>Instrumentos</label><textarea data-field="eInstrumentos"></textarea></div>
+            <div class="field" data-photo-key="eIsolamento" data-photo-label="Inspeção sob isolamento"><label>Inspeção sob isolamento</label><textarea data-field="eIsolamento"></textarea></div>
+            <div class="field" data-photo-key="ePlaca" data-photo-label="Placa de identificação, TAG e categoria"><label>Placa de identificação, TAG e categoria</label><textarea data-field="ePlaca"></textarea></div>
+          </div>
+
+          <!-- TUBULAÇÃO -->
+          <div data-types-only="tubulacao" style="display:flex; flex-direction:column; gap:16px;">
+            <div id="isoList" style="display:flex; flex-direction:column; gap:18px;"></div>
+            <button type="button" class="btn ghost" id="addIsoBtn" style="align-self:flex-start;">+ Adicionar isométrico</button>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 10 Recomendações -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Recomendações Técnicas de Inspeção</h2></div>
+        <div class="card-body"><textarea data-field="recomendacoes"></textarea></div>
+      </section>
+
+      <!-- 11 Norma de referência -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Norma de Referência</h2></div>
+        <div class="card-body pad-0">
+          <table class="ref" data-types-only="interna,externa">
+            <tr><th>Documento</th><th>Título</th></tr>
+            <tr><td>API 510</td><td>Pressure Vessel Inspection Code</td></tr>
+            <tr><td>API 572</td><td>Inspection of Pressure Vessels</td></tr>
+            <tr><td>ASME Sec. V</td><td>Nondestructive Examinations</td></tr>
+            <tr><td>ASME Sec. VIII, Div. 1 &amp; 2</td><td>Boiler Pressure Vessel Code</td></tr>
+            <tr><td>Nº 1</td><td>Guias de Inspeção de Vasos de Pressão do IBP</td></tr>
+            <tr><td>NR-06</td><td>Equipamento de Proteção Individual – EPI</td></tr>
+            <tr><td>NR-13</td><td>Caldeiras, vasos de pressão, tubulação e tanques metálicos</td></tr>
+          </table>
+          <table class="ref" data-types-only="tubulacao">
+            <tr><th>Documento</th><th>Título</th></tr>
+            <tr><td>API 574</td><td>Inspection Practices for Piping System Components</td></tr>
+            <tr><td>API 570</td><td>Piping Inspection Code: In-service Inspection, Rating, Repair and Alteration of Piping Systems</td></tr>
+            <tr><td>Guia 06 – IBP</td><td>Inspeção de Sistemas de Tubulações</td></tr>
+            <tr><td>NR-06</td><td>Equipamento de Proteção Individual – EPI</td></tr>
+            <tr><td>NR-13</td><td>Caldeiras, vasos de pressão, tubulação e tanques metálicos</td></tr>
+          </table>
+        </div>
+      </section>
+
+      <!-- 12 Vida residual -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Avaliação de Vida Residual</h2></div>
+        <div class="card-body grid g2">
+          <div class="field"><label>Nº Relatório</label><input type="text" data-field="vrNumero"></div>
+          <div class="field"><label>Vida remanescente</label><input type="text" data-field="vrRemanescente"></div>
+        </div>
+      </section>
+
+      <!-- 13 Anexos -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Anexos</h2></div>
+        <div class="card-body"><textarea data-field="anexos"></textarea></div>
+      </section>
+
+      <!-- 14 Conclusão -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Conclusão</h2></div>
+        <div class="card-body"><textarea data-field="conclusao"></textarea></div>
+      </section>
+
+      <!-- 15 Registro fotográfico -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Registro Fotográfico</h2></div>
+        <div class="card-body">
+          <div class="gallery-divider">Fotos vinculadas aos itens da inspeção</div>
+          <div class="linked-gallery" id="linkedGallery">
+            <div class="hint" style="color:var(--muted); font-size:12px;">Nenhuma foto anexada a itens ainda — use o botão "＋ Foto" em cada item da inspeção acima.</div>
+          </div>
+          <div class="gallery-divider">Fotos gerais (sem item específico)</div>
+          <div class="photo-grid" id="photoGrid">
+            <label class="add-photo" for="photoInput">
+              <span class="ic">＋</span>Adicionar foto<br>(câmera ou galeria)
+            </label>
+          </div>
+          <input id="photoInput" type="file" accept="image/*" capture="environment" multiple onchange="addPhotos(event)">
+        </div>
+      </section>
+
+      <!-- 16 Assinaturas -->
+      <section class="card" data-section data-types="interna,externa,tubulacao">
+        <div class="card-head"><h2><span class="n num"></span>Assinaturas</h2></div>
+        <div class="card-body sig-grid">
+          <div class="sig-box">
+            <h3>Inspetor</h3>
+            <div class="field" style="margin-bottom:10px"><label>Nome</label><input type="text" data-field="insNome"></div>
+            <div class="field" style="margin-bottom:10px"><label>Dado de certificação</label><input type="text" data-field="insCert"></div>
+            <div class="field" style="margin-bottom:10px"><label>Função</label><input type="text" data-field="insFuncao"></div>
+            <div class="field"><label>Data</label><input type="date" data-field="insData"></div>
+          </div>
+          <div class="sig-box">
+            <h3>Profissional Legalmente Habilitado</h3>
+            <div class="field" style="margin-bottom:10px"><label>Nome</label><input type="text" data-field="plhNome"></div>
+            <div class="field" style="margin-bottom:10px"><label>Dado de certificação</label><input type="text" data-field="plhCert"></div>
+            <div class="field" style="margin-bottom:10px"><label>Função</label><input type="text" data-field="plhFuncao"></div>
+            <div class="field"><label>Data</label><input type="date" data-field="plhData"></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+    <!-- ===================== /VISTA: FORMULÁRIO ===================== -->
+
+    <!-- ===================== VISTA: HISTÓRICO ===================== -->
+    <div id="historyView" class="hidden">
+      <div class="history-toolbar">
+        <h2>Histórico de Inspeções</h2>
+        <button class="btn primary" id="newInspectionBtn" type="button">+ Nova inspeção</button>
+      </div>
+      <div id="historyList"></div>
+    </div>
+    <!-- ===================== /VISTA: HISTÓRICO ===================== -->
+
+  </main>
+</div>
+
+<div class="bar" id="formBar">
+  <div class="status" id="statusText">0 seções com conteúdo</div>
+  <div class="actions">
+    <button class="btn ghost" id="clearAllBtn" type="button">Limpar tudo</button>
+    <button class="btn green" id="saveBtn" type="button">Salvar inspeção</button>
+    <button class="btn primary" id="exportBtn" type="button">Salvar como Word (.docx)</button>
+    <button class="btn amber" id="printBtn" type="button">Imprimir / Salvar PDF</button>
+  </div>
+</div>
+
+<script src="vendor/jszip.min.js"></script>
+<script src="db.js"></script>
+<script src="docx.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
