@@ -502,7 +502,7 @@ function collectReportData() {
 // aparelho suportar, abrimos direto o menu "Compartilhar" nativo — ele deixa
 // escolher o app corporativo e anexa o .docx sem passar pelo armazenamento
 // interno. Só cai no download tradicional se o compartilhamento não existir.
-async function shareOrDownloadDocx(blob, filename) {
+async function shareOrDownloadFile(blob, filename) {
   try {
     if (navigator.canShare) {
       const file = new File([blob], filename, { type: blob.type });
@@ -549,7 +549,7 @@ async function exportWord() {
     const dateForFile = new Date().toISOString().slice(0, 10);
     const filename = 'relatorio_' + currentType + '_' + tagSafe + '_' + dateForFile + '.docx';
 
-    await shareOrDownloadDocx(blob, filename);
+    await shareOrDownloadFile(blob, filename);
   } catch (err) {
     console.error(err);
     alert('Não foi possível gerar o arquivo Word: ' + err.message);
@@ -784,6 +784,77 @@ async function deleteInspectionFromHistory(id) {
   await dbDeleteInspection(id);
   renderHistoryView();
 }
+
+// ---------------------------------------------------------------------
+// Backup manual do histórico (exportar/importar entre aparelhos)
+// ---------------------------------------------------------------------
+// O histórico fica só no aparelho onde a inspeção foi feita (sem nuvem,
+// sem login). Para ver o mesmo histórico em outro aparelho (ex.: computador),
+// é preciso exportar um arquivo aqui e importar lá — continua tudo local,
+// só que a transferência do arquivo é manual (e-mail, Teams, pen drive etc.).
+
+const BACKUP_FORMAT = 'inspecoes-app-backup';
+const BACKUP_VERSION = 1;
+
+async function exportBackup() {
+  const btn = document.getElementById('exportBackupBtn');
+  const originalLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Exportando…';
+  try {
+    const records = await dbGetAllInspections();
+    if (!records.length) {
+      alert('Não há nenhuma inspeção salva neste aparelho para exportar.');
+      return;
+    }
+    const payload = {
+      format: BACKUP_FORMAT,
+      version: BACKUP_VERSION,
+      exportedAt: new Date().toISOString(),
+      records
+    };
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    const dateForFile = new Date().toISOString().slice(0, 10);
+    const filename = 'backup-inspecoes_' + dateForFile + '.json';
+    await shareOrDownloadFile(blob, filename);
+  } catch (err) {
+    console.error(err);
+    alert('Não foi possível exportar o backup: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = originalLabel;
+  }
+}
+
+document.getElementById('exportBackupBtn').addEventListener('click', exportBackup);
+
+document.getElementById('importBackupBtn').addEventListener('click', () => {
+  document.getElementById('importBackupInput').click();
+});
+
+document.getElementById('importBackupInput').addEventListener('change', async (evt) => {
+  const file = evt.target.files && evt.target.files[0];
+  evt.target.value = '';
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    const records = Array.isArray(payload) ? payload : payload.records; // aceita tanto o formato do backup quanto uma lista simples de registros
+    if (!Array.isArray(records) || !records.length) {
+      alert('Esse arquivo não parece ser um backup válido do app.');
+      return;
+    }
+    let imported = 0;
+    for (const record of records) {
+      if (!record || !record.id) continue;
+      await dbSaveInspection(record);
+      imported++;
+    }
+    alert(imported + ' inspeção(ões) importada(s) para este aparelho.');
+    renderHistoryView();
+  } catch (err) {
+    console.error(err);
+    alert('Não foi possível importar o backup: ' + err.message);
+  }
+});
 
 // ---------------------------------------------------------------------
 // Service worker (PWA offline)

@@ -513,8 +513,13 @@
     <div id="historyView" class="hidden">
       <div class="history-toolbar">
         <h2>Histórico de Inspeções</h2>
-        <button class="btn primary" id="newInspectionBtn" type="button">+ Nova inspeção</button>
+        <div class="actions">
+          <button class="btn ghost" id="exportBackupBtn" type="button">Exportar backup</button>
+          <button class="btn ghost" id="importBackupBtn" type="button">Importar backup</button>
+          <button class="btn primary" id="newInspectionBtn" type="button">+ Nova inspeção</button>
+        </div>
       </div>
+      <input id="importBackupInput" type="file" accept="application/json,.json">
       <div id="historyList"></div>
     </div>
     <!-- ===================== /VISTA: HISTÓRICO ===================== -->
