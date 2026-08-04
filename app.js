@@ -856,6 +856,70 @@ document.getElementById('importBackupInput').addEventListener('change', async (e
   }
 });
 
+// Backup opcional no Google Drive pessoal (ver drive.js). Continua sendo o
+// mesmo formato de arquivo do backup local — só muda o destino.
+document.getElementById('driveBackupBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('driveBackupBtn');
+  const originalLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    const records = await dbGetAllInspections();
+    if (!records.length) {
+      alert('Não há nenhuma inspeção salva neste aparelho para enviar.');
+      return;
+    }
+    await getDriveAccessToken();
+    const folderId = await findOrCreateDriveFolder();
+    const payload = { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt: new Date().toISOString(), records };
+    const dateForFile = new Date().toISOString().slice(0, 10);
+    const filename = 'backup-inspecoes_' + dateForFile + '_' + Date.now() + '.json';
+    await uploadJsonToDriveFolder(folderId, filename, JSON.stringify(payload));
+    alert('Backup enviado para a pasta "' + GOOGLE_DRIVE_FOLDER_NAME + '" no seu Google Drive.');
+  } catch (err) {
+    console.error(err);
+    alert('Não foi possível enviar o backup ao Google Drive: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = originalLabel;
+  }
+});
+
+document.getElementById('driveRestoreBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('driveRestoreBtn');
+  const originalLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Buscando…';
+  try {
+    await getDriveAccessToken();
+    const folderId = await findOrCreateDriveFolder();
+    const files = await listDriveBackupFiles(folderId);
+    if (!files.length) {
+      alert('Nenhum backup encontrado na pasta "' + GOOGLE_DRIVE_FOLDER_NAME + '" do seu Google Drive.');
+      return;
+    }
+    const latest = files[0];
+    if (!confirm('Restaurar o backup mais recente encontrado ("' + latest.name + '")? As inspeções serão somadas ao histórico deste aparelho.')) return;
+    const text = await downloadDriveFileText(latest.id);
+    const payload = JSON.parse(text);
+    const records = Array.isArray(payload) ? payload : payload.records;
+    if (!Array.isArray(records) || !records.length) {
+      alert('Esse backup não parece válido.');
+      return;
+    }
+    let imported = 0;
+    for (const record of records) {
+      if (!record || !record.id) continue;
+      await dbSaveInspection(record);
+      imported++;
+    }
+    alert(imported + ' inspeção(ões) importada(s) do Google Drive.');
+    renderHistoryView();
+  } catch (err) {
+    console.error(err);
+    alert('Não foi possível restaurar do Google Drive: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = originalLabel;
+  }
+});
+
 // ---------------------------------------------------------------------
 // Service worker (PWA offline)
 // ---------------------------------------------------------------------

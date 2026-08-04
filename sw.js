@@ -1,11 +1,12 @@
 // Service worker: cacheia todo o app no primeiro carregamento para funcionar 100% offline depois.
-const CACHE_NAME = 'inspecoes-app-v5';
+const CACHE_NAME = 'inspecoes-app-v6';
 const ASSETS = [
   './',
   './index.html',
   './app.js',
   './db.js',
   './docx.js',
+  './drive.js',
   './manifest.webmanifest',
   './vendor/jszip.min.js',
   './icons/icon-192.png',
