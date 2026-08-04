@@ -496,6 +496,36 @@ function collectReportData() {
 // Exportar como Word (.docx)
 // ---------------------------------------------------------------------
 
+// Em aparelhos corporativos com armazenamento interno bloqueado (política de
+// proteção contra vazamento de dados), a saída de arquivos costuma ser feita
+// só pelos apps oficiais (e-mail/Teams corporativo). Por isso, sempre que o
+// aparelho suportar, abrimos direto o menu "Compartilhar" nativo — ele deixa
+// escolher o app corporativo e anexa o .docx sem passar pelo armazenamento
+// interno. Só cai no download tradicional se o compartilhamento não existir.
+async function shareOrDownloadDocx(blob, filename) {
+  try {
+    if (navigator.canShare) {
+      const file = new File([blob], filename, { type: blob.type });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+        return;
+      }
+    }
+  } catch (err) {
+    if (err && err.name === 'AbortError') return; // usuário cancelou o compartilhamento
+    console.warn('Compartilhamento indisponível, baixando o arquivo em vez disso:', err);
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 async function exportWord() {
   const btn = document.getElementById('exportBtn');
   const originalLabel = btn.textContent;
@@ -509,16 +539,11 @@ async function exportWord() {
 
     const blob = await buildDocxBlob({ typeLabel: t.label, tag, unidade, local, sections });
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
     const tagSafe = (tag || 'relatorio').replace(/[^a-zA-Z0-9-_]/g, '_');
     const dateForFile = new Date().toISOString().slice(0, 10);
-    a.href = url;
-    a.download = 'relatorio_' + currentType + '_' + tagSafe + '_' + dateForFile + '.docx';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const filename = 'relatorio_' + currentType + '_' + tagSafe + '_' + dateForFile + '.docx';
+
+    await shareOrDownloadDocx(blob, filename);
   } catch (err) {
     console.error(err);
     alert('Não foi possível gerar o arquivo Word: ' + err.message);
