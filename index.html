@@ -38,10 +38,10 @@
   .brand .code{ font-family:var(--f-mono); font-size:11px; letter-spacing:.06em; color:var(--amber); }
   .brand h1{ font-family:var(--f-display); font-weight:600; font-size:17px; letter-spacing:.02em; margin:4px 0 0; line-height:1.25; }
 
-  .mode-switch{ display:flex; flex-direction:column; gap:2px; padding:0 12px 14px; margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,.1); }
-  .mode-btn{ all:unset; cursor:pointer; display:flex; align-items:center; gap:9px; padding:10px 10px; border-radius:6px; font-size:13px; color:#B8C2CB; }
-  .mode-btn:hover{ background:rgba(255,255,255,.05); color:#fff; }
-  .mode-btn.active{ background:rgba(232,163,61,.14); color:#fff; font-weight:600; }
+  .mode-switch{ display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+  .mode-btn{ all:unset; cursor:pointer; display:flex; align-items:center; gap:8px; padding:11px 18px; border-radius:7px; font-size:13px; font-weight:600; color:var(--steel); border:1.5px solid var(--border); background:#fff; }
+  .mode-btn:hover{ border-color:var(--amber-dark); color:var(--amber-dark); }
+  .mode-btn.active{ background:var(--navy); border-color:var(--navy); color:#fff; }
   .mode-btn .ic{ font-size:15px; }
 
   .navlist{ list-style:none; margin:0; padding:0; }
@@ -212,16 +212,16 @@
       <h1>Relatório de<br>Inspeção</h1>
     </div>
 
-    <div class="mode-switch">
-      <button class="mode-btn active" id="navFormBtn" type="button"><span class="ic">📝</span>Formulário</button>
-      <button class="mode-btn" id="navHistoryBtn" type="button"><span class="ic">🕘</span>Histórico de Inspeções</button>
-    </div>
-
     <ul class="navlist" id="navlist"></ul>
     <div class="sidebar-foot" id="footStatus">v1.0 · offline</div>
   </nav>
 
   <main class="main">
+
+    <div class="mode-switch">
+      <button class="mode-btn active" id="navFormBtn" type="button"><span class="ic">📝</span>Formulário</button>
+      <button class="mode-btn" id="navHistoryBtn" type="button"><span class="ic">🕘</span>Histórico de Inspeções</button>
+    </div>
 
     <!-- ===================== VISTA: FORMULÁRIO ===================== -->
     <div id="formView">
