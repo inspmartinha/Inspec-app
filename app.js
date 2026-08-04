@@ -539,6 +539,12 @@ async function exportWord() {
 
     const blob = await buildDocxBlob({ typeLabel: t.label, tag, unidade, local, sections });
 
+    try {
+      await persistCurrentInspection(); // salva no Histórico junto, se houver TAG preenchida
+    } catch (err) {
+      console.error('Não foi possível salvar automaticamente no histórico:', err);
+    }
+
     const tagSafe = (tag || 'relatorio').replace(/[^a-zA-Z0-9-_]/g, '_');
     const dateForFile = new Date().toISOString().slice(0, 10);
     const filename = 'relatorio_' + currentType + '_' + tagSafe + '_' + dateForFile + '.docx';
@@ -623,6 +629,41 @@ function uuid() {
   return 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
 }
 
+// Grava a inspeção atual no Histórico (IndexedDB). Não valida nem avisa nada
+// — quem chama decide o que fazer se não houver TAG preenchida. Retorna o
+// registro salvo, ou null se não havia TAG (nada para identificar o salvo).
+async function persistCurrentInspection() {
+  const tagVal = (document.querySelector('[data-field="tag"]').value || '').trim();
+  if (!tagVal) return null;
+
+  const now = new Date().toISOString();
+  const serialized = serializeForm();
+  let createdAt = now;
+  if (currentRecordId) {
+    const existing = await dbGetInspection(currentRecordId);
+    if (existing && existing.createdAt) createdAt = existing.createdAt;
+  }
+  const record = {
+    id: currentRecordId || uuid(),
+    tipo: currentType,
+    tag: serialized.fields.tag || '',
+    unidade: serialized.fields.unidade || '',
+    local: serialized.fields.local || '',
+    numRI: serialized.fields.numRI || '',
+    dataInicio: serialized.fields.dataInicio || '',
+    dataFim: serialized.fields.dataFim || '',
+    createdAt,
+    savedAt: now,
+    fields: serialized.fields,
+    isometricos: serialized.isometricos,
+    photosGeral: serialized.photosGeral,
+    itemPhotos: serialized.itemPhotos
+  };
+  await dbSaveInspection(record);
+  currentRecordId = record.id;
+  return record;
+}
+
 async function saveInspection() {
   const tagVal = (document.querySelector('[data-field="tag"]').value || '').trim();
   if (!tagVal) {
@@ -633,31 +674,7 @@ async function saveInspection() {
   const originalLabel = btn.textContent;
   btn.disabled = true; btn.textContent = 'Salvando…';
   try {
-    const now = new Date().toISOString();
-    const serialized = serializeForm();
-    let createdAt = now;
-    if (currentRecordId) {
-      const existing = await dbGetInspection(currentRecordId);
-      if (existing && existing.createdAt) createdAt = existing.createdAt;
-    }
-    const record = {
-      id: currentRecordId || uuid(),
-      tipo: currentType,
-      tag: serialized.fields.tag || '',
-      unidade: serialized.fields.unidade || '',
-      local: serialized.fields.local || '',
-      numRI: serialized.fields.numRI || '',
-      dataInicio: serialized.fields.dataInicio || '',
-      dataFim: serialized.fields.dataFim || '',
-      createdAt,
-      savedAt: now,
-      fields: serialized.fields,
-      isometricos: serialized.isometricos,
-      photosGeral: serialized.photosGeral,
-      itemPhotos: serialized.itemPhotos
-    };
-    await dbSaveInspection(record);
-    currentRecordId = record.id;
+    await persistCurrentInspection();
     btn.textContent = 'Salvo ✓';
     setTimeout(() => { btn.textContent = originalLabel; }, 1600);
   } catch (err) {
