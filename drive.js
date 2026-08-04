@@ -10,7 +10,7 @@
 // Para habilitar, preencha o Client ID OAuth abaixo (gratuito, criado em
 // console.cloud.google.com). Sem isso, os botões avisam que a função ainda
 // não foi configurada.
-const GOOGLE_DRIVE_CLIENT_ID = ''; // <-- cole aqui algo como "123456789-abc.apps.googleusercontent.com"
+const GOOGLE_DRIVE_CLIENT_ID = '907989766330-7473baair3eoqavsbhb3b4q7vjvac6q5.apps.googleusercontent.com';
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const GOOGLE_DRIVE_FOLDER_NAME = 'Inspecoes App - Backups';
 
