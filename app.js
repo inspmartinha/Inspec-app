@@ -14,6 +14,57 @@ let currentRecordId = null;
 let isoSeq = 0;
 
 // ---------------------------------------------------------------------
+// Rascunho automático (evita perder dados se a aba recarregar sozinha,
+// por exemplo ao voltar da câmera do aparelho enquanto ainda não deu
+// tempo de clicar em "Salvar inspeção")
+// ---------------------------------------------------------------------
+
+function isDraftMeaningful(serialized) {
+  const hasFieldValue = Object.values(serialized.fields || {}).some(v => v && String(v).trim() !== '');
+  const hasPhotos = (serialized.photosGeral || []).length > 0;
+  const hasItemPhotos = Object.values(serialized.itemPhotos || {}).some(list => (list || []).length > 0);
+  return hasFieldValue || hasPhotos || hasItemPhotos;
+}
+
+let __draftSaveTimer = null;
+let __savingDraft = false;
+
+// Grava o estado atual do formulário como rascunho. `immediate: true` pula
+// o debounce — use nos momentos de risco (foto tirada, aba indo para
+// segundo plano) em que não dá pra esperar alguns segundos.
+function saveDraft(options) {
+  options = options || {};
+  clearTimeout(__draftSaveTimer);
+  if (!options.immediate) {
+    __draftSaveTimer = setTimeout(saveDraftNow, 2000);
+    return;
+  }
+  saveDraftNow();
+}
+
+async function saveDraftNow() {
+  if (__savingDraft) return;
+  __savingDraft = true;
+  try {
+    const serialized = serializeForm();
+    if (!isDraftMeaningful(serialized)) {
+      await dbClearDraft();
+      return;
+    }
+    await dbSaveDraft({
+      savedAt: new Date().toISOString(),
+      currentType,
+      currentRecordId,
+      ...serialized
+    });
+  } catch (err) {
+    console.error('Não foi possível salvar o rascunho automático:', err);
+  } finally {
+    __savingDraft = false;
+  }
+}
+
+// ---------------------------------------------------------------------
 // Navegação entre vistas (Formulário / Histórico)
 // ---------------------------------------------------------------------
 
@@ -117,7 +168,7 @@ function observeSections() {
 }
 
 document.querySelectorAll('.type-btn').forEach(btn => {
-  btn.addEventListener('click', () => setType(btn.dataset.type));
+  btn.addEventListener('click', () => { setType(btn.dataset.type); saveDraft({ immediate: true }); });
 });
 
 function syncPlate() {
@@ -143,8 +194,19 @@ function updateStatus() {
 }
 
 document.body.addEventListener('input', (e) => {
-  if (e.target.matches('input[data-field], textarea[data-field], select[data-field]')) updateStatus();
+  if (e.target.matches('input[data-field], textarea[data-field], select[data-field]')) {
+    updateStatus();
+    saveDraft();
+  }
 });
+
+// Momentos de risco de a aba ser recarregada/descartada pelo sistema
+// (ex.: ao abrir a câmera nativa pra tirar foto) — grava o rascunho na
+// hora, sem esperar o debounce, para não perder o que já foi digitado.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveDraft({ immediate: true });
+});
+window.addEventListener('pagehide', () => saveDraft({ immediate: true }));
 
 // ---------------------------------------------------------------------
 // Fotos gerais
@@ -160,7 +222,7 @@ function addPhotos(evt) {
     reader.onload = () => {
       const id = 'p' + Date.now() + Math.random().toString(36).slice(2, 6);
       photos.push({ id, src: reader.result, caption: '' });
-      renderPhotos(); updateStatus();
+      renderPhotos(); updateStatus(); saveDraft({ immediate: true });
     };
     reader.readAsDataURL(file);
   });
@@ -179,10 +241,10 @@ function renderPhotos() {
     photoGrid.insertBefore(card, addPhotoBtn);
   });
   photoGrid.querySelectorAll('[data-photo-caption]').forEach(inp => {
-    inp.addEventListener('input', () => { const p = photos.find(x => x.id === inp.dataset.photoCaption); if (p) p.caption = inp.value; });
+    inp.addEventListener('input', () => { const p = photos.find(x => x.id === inp.dataset.photoCaption); if (p) p.caption = inp.value; saveDraft(); });
   });
   photoGrid.querySelectorAll('[data-photo-remove]').forEach(btn => {
-    btn.addEventListener('click', () => { photos = photos.filter(x => x.id !== btn.dataset.photoRemove); renderPhotos(); updateStatus(); });
+    btn.addEventListener('click', () => { photos = photos.filter(x => x.id !== btn.dataset.photoRemove); renderPhotos(); updateStatus(); saveDraft({ immediate: true }); });
   });
 }
 
@@ -242,6 +304,7 @@ function addIsometrico(forceUid) {
     relabelIsometricos();
     renderLinkedGallery();
     updateStatus();
+    saveDraft({ immediate: true });
   });
   relabelIsometricos();
   updateStatus();
@@ -257,7 +320,7 @@ function relabelIsometricos() {
   });
 }
 
-document.getElementById('addIsoBtn').addEventListener('click', () => addIsometrico());
+document.getElementById('addIsoBtn').addEventListener('click', () => { addIsometrico(); saveDraft({ immediate: true }); });
 
 // ---------------------------------------------------------------------
 // Fotos vinculadas a itens da inspeção
@@ -290,6 +353,7 @@ function buildItemPhotoWidgets(root) {
           renderItemThumbs(key);
           renderLinkedGallery();
           updateStatus();
+          saveDraft({ immediate: true });
         };
         reader.readAsDataURL(file);
       });
@@ -316,6 +380,7 @@ function renderItemThumbs(key) {
     btn.onclick = () => {
       itemPhotos[key] = itemPhotos[key].filter(p => p.id !== btn.dataset.rmId);
       renderItemThumbs(key); renderLinkedGallery(); updateStatus();
+      saveDraft({ immediate: true });
     };
   });
 }
@@ -369,6 +434,7 @@ function startNewInspection() {
   renderPhotos(); renderAllItemThumbs(); renderLinkedGallery(); syncPlate();
   setType('interna');
   updateStatus();
+  dbClearDraft().catch(err => console.error('Não foi possível limpar o rascunho:', err));
 }
 
 document.getElementById('clearAllBtn').addEventListener('click', clearAllBtnHandler);
@@ -661,6 +727,7 @@ async function persistCurrentInspection() {
   };
   await dbSaveInspection(record);
   currentRecordId = record.id;
+  await dbClearDraft(); // já está salvo no Histórico definitivo, não precisa mais do rascunho
   return record;
 }
 
@@ -762,6 +829,7 @@ async function openInspectionFromHistory(id) {
   currentRecordId = record.id;
   populateForm(record);
   showFormView();
+  saveDraft({ immediate: true }); // já rastreia esta inspeção como rascunho, caso a aba seja recarregada no meio da edição
 }
 
 async function regenerateDocxFromHistory(id, btn) {
@@ -772,6 +840,7 @@ async function regenerateDocxFromHistory(id, btn) {
   try {
     currentRecordId = record.id;
     populateForm(record);
+    saveDraft({ immediate: true });
     await exportWord();
     showFormView();
   } finally {
@@ -934,7 +1003,36 @@ if ('serviceWorker' in navigator) {
 // Inicialização
 // ---------------------------------------------------------------------
 
-buildItemPhotoWidgets(document);
-addIsometrico();
-setType('interna');
-showFormView();
+async function initApp() {
+  buildItemPhotoWidgets(document);
+
+  let draft = null;
+  try { draft = await dbGetDraft(); } catch (err) { console.error('Não foi possível ler o rascunho salvo:', err); }
+
+  if (draft && isDraftMeaningful(draft)) {
+    const continuar = confirm(
+      'Encontramos uma inspeção não salva de uma sessão anterior (provavelmente a página recarregou sozinha, por exemplo ao voltar da câmera).\n\n' +
+      'Continuar de onde parou?\n\n' +
+      'OK = continuar o rascunho\nCancelar = começar um formulário em branco (o rascunho será descartado)'
+    );
+    if (continuar) {
+      currentRecordId = draft.currentRecordId || null;
+      populateForm({
+        tipo: draft.currentType || 'interna',
+        isometricos: draft.isometricos,
+        fields: draft.fields,
+        photosGeral: draft.photosGeral,
+        itemPhotos: draft.itemPhotos
+      });
+      showFormView();
+      return;
+    }
+    await dbClearDraft();
+  }
+
+  addIsometrico();
+  setType('interna');
+  showFormView();
+}
+
+initApp();
