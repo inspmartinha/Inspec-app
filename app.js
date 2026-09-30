@@ -218,13 +218,14 @@ const addPhotoBtn = photoGrid.querySelector('.add-photo');
 function addPhotos(evt) {
   const files = Array.from(evt.target.files || []);
   files.forEach(file => {
-    const reader = new FileReader();
-    reader.onload = () => {
+    readPhotoFile(file).then(dataUrl => {
       const id = 'p' + Date.now() + Math.random().toString(36).slice(2, 6);
-      photos.push({ id, src: reader.result, caption: '' });
+      photos.push({ id, src: dataUrl, caption: '' });
       renderPhotos(); updateStatus(); saveDraft({ immediate: true });
-    };
-    reader.readAsDataURL(file);
+    }).catch(err => {
+      console.error('Não foi possível ler a foto:', err);
+      alert('Não foi possível adicionar essa foto.');
+    });
   });
   evt.target.value = '';
 }
@@ -347,15 +348,16 @@ function buildItemPhotoWidgets(root) {
     wrap.querySelector('input[type=file]').addEventListener('change', (evt) => {
       const files = Array.from(evt.target.files || []);
       files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          itemPhotos[key].push({ id: 'ip' + Date.now() + Math.random().toString(36).slice(2, 6), src: reader.result });
+        readPhotoFile(file).then(dataUrl => {
+          itemPhotos[key].push({ id: 'ip' + Date.now() + Math.random().toString(36).slice(2, 6), src: dataUrl });
           renderItemThumbs(key);
           renderLinkedGallery();
           updateStatus();
           saveDraft({ immediate: true });
-        };
-        reader.readAsDataURL(file);
+        }).catch(err => {
+          console.error('Não foi possível ler a foto:', err);
+          alert('Não foi possível adicionar essa foto.');
+        });
       });
       evt.target.value = '';
     });
